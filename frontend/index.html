@@ -34,6 +34,13 @@
               <button id="copyHealthUrl" type="button">复制</button>
             </div>
           </div>
+          <div class="field">
+            <label>文件数据接口</label>
+            <div class="copy-row">
+              <input id="fileDataUrl" readonly value="http://127.0.0.1:39291/file-data" />
+              <button id="copyFileDataUrl" type="button">复制</button>
+            </div>
+          </div>
         </article>
 
         <article class="panel">
@@ -45,6 +52,11 @@
   "query": { "page": "1" },
   "body": { "name": "demo" },
   "timeoutMs": 30000
+}</pre>
+          <pre class="sample">{
+  "fileUrl": "https://example.com/file.pdf",
+  "headers": { "Authorization": "Bearer token" },
+  "timeoutMs": 60000
 }</pre>
         </article>
       </section>

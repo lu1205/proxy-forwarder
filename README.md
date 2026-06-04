@@ -8,6 +8,7 @@
 
 - 健康检查：`GET http://127.0.0.1:39291/health`
 - 请求转发：`POST http://127.0.0.1:39291/forward`
+- 文件数据获取：`POST http://127.0.0.1:39291/file-data`
 
 请求示例：
 
@@ -43,6 +44,20 @@
   "elapsedMs": 132
 }
 ```
+
+文件数据获取请求示例：
+
+```json
+{
+  "fileUrl": "https://example.com/file.pdf",
+  "headers": {
+    "Authorization": "Bearer token"
+  },
+  "timeoutMs": 60000
+}
+```
+
+也可以使用 `url` 或 `link` 字段传文件链接。该接口会使用 `GET` 请求目标文件地址，并把目标文件的原始二进制内容直接作为响应体返回；如果目标响应包含 `Content-Type` 或 `Content-Disposition`，会同步返回给调用方。
 
 ## 开发运行
 

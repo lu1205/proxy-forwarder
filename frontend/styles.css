@@ -172,6 +172,10 @@ pre {
   white-space: pre-wrap;
 }
 
+pre.sample {
+  margin-top: 12px;
+}
+
 .tester-head {
   align-items: center;
   display: flex;

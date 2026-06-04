@@ -1,5 +1,6 @@
 const statusEl = document.querySelector("#serverStatus");
 const forwardUrlEl = document.querySelector("#forwardUrl");
+const fileDataUrlEl = document.querySelector("#fileDataUrl");
 const healthUrlEl = document.querySelector("#healthUrl");
 const requestBodyEl = document.querySelector("#requestBody");
 const responseBodyEl = document.querySelector("#responseBody");
@@ -25,6 +26,7 @@ async function loadServiceInfo() {
 
   const info = await invoke("get_service_info");
   forwardUrlEl.value = info.forwardUrl;
+  fileDataUrlEl.value = info.fileDataUrl;
   healthUrlEl.value = info.healthUrl;
 }
 
@@ -49,12 +51,14 @@ async function sendTestRequest() {
 }
 
 document.querySelector("#copyForwardUrl").addEventListener("click", () => copyValue(forwardUrlEl));
+document.querySelector("#copyFileDataUrl").addEventListener("click", () => copyValue(fileDataUrlEl));
 document.querySelector("#copyHealthUrl").addEventListener("click", () => copyValue(healthUrlEl));
 sendTestEl.addEventListener("click", sendTestRequest);
 
 if (listen) {
   listen("forward-server-ready", (event) => {
     forwardUrlEl.value = event.payload.forwardUrl;
+    fileDataUrlEl.value = event.payload.fileDataUrl;
     healthUrlEl.value = event.payload.healthUrl;
     setStatus("服务已启动");
   });

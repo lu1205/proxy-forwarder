@@ -6,8 +6,13 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use axum::{
+    body::Body,
     extract::State,
-    http::{HeaderMap, Method, StatusCode},
+    http::{
+        header::{CONTENT_DISPOSITION, CONTENT_TYPE},
+        HeaderMap, Method, StatusCode,
+    },
+    response::Response,
     routing::{get, post},
     Json, Router,
 };
@@ -47,6 +52,15 @@ struct ForwardRequest {
     timeout_ms: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileDataRequest {
+    #[serde(alias = "fileUrl", alias = "link")]
+    url: String,
+    headers: Option<HashMap<String, String>>,
+    timeout_ms: Option<u64>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ForwardResponse {
@@ -64,6 +78,7 @@ struct ServiceInfo {
     port: u16,
     base_url: String,
     forward_url: String,
+    file_data_url: String,
     health_url: String,
 }
 
@@ -193,6 +208,7 @@ async fn run_forward_server(
     let router = Router::new()
         .route("/health", get(health))
         .route("/forward", post(forward))
+        .route("/file-data", post(file_data))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -212,8 +228,47 @@ async fn health() -> Json<Value> {
     Json(json!({
         "ok": true,
         "name": "proxy-forwarder",
-        "forwardUrl": service_info(DEFAULT_BIND_HOST, DEFAULT_PORT).forward_url
+        "forwardUrl": service_info(DEFAULT_BIND_HOST, DEFAULT_PORT).forward_url,
+        "fileDataUrl": service_info(DEFAULT_BIND_HOST, DEFAULT_PORT).file_data_url
     }))
+}
+
+async fn file_data(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<FileDataRequest>,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let started_at = Instant::now();
+    let result = execute_file_data(&state.client, &headers, payload, started_at).await;
+
+    match result {
+        Ok(response) => {
+            let _ = state.app_handle.emit(
+                "file-data-request-finished",
+                json!({
+                    "status": response.status().as_u16(),
+                    "elapsedMs": started_at.elapsed().as_millis()
+                }),
+            );
+            Ok(response)
+        }
+        Err(error) => {
+            let _ = state.app_handle.emit(
+                "file-data-request-failed",
+                json!({
+                    "message": error.to_string(),
+                    "elapsedMs": started_at.elapsed().as_millis()
+                }),
+            );
+            Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": error.to_string(),
+                    "elapsedMs": started_at.elapsed().as_millis()
+                })),
+            ))
+        }
+    }
 }
 
 async fn forward(
@@ -330,12 +385,67 @@ async fn execute_forward(
     })
 }
 
+async fn execute_file_data(
+    client: &reqwest::Client,
+    incoming_headers: &HeaderMap,
+    payload: FileDataRequest,
+    _started_at: Instant,
+) -> anyhow::Result<Response> {
+    let url = Url::parse(&payload.url).context("url must be an absolute http/https URL")?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(anyhow!("only http and https URLs are supported"));
+    }
+
+    let timeout = Duration::from_millis(payload.timeout_ms.unwrap_or(60_000).clamp(1_000, 300_000));
+    let mut request = client.get(url).timeout(timeout);
+
+    if let Some(headers) = payload.headers {
+        for (key, value) in headers {
+            let name = key
+                .parse::<HeaderName>()
+                .with_context(|| format!("invalid header name: {key}"))?;
+            let value = HeaderValue::from_str(&value)
+                .with_context(|| format!("invalid header value for {key}"))?;
+            request = request.header(name, value);
+        }
+    }
+
+    if let Some(trace_id) = incoming_headers.get("x-request-id") {
+        request = request.header("x-request-id", trace_id.clone());
+    }
+
+    let target_response = request.send().await.context("target file request failed")?;
+    let status = target_response.status();
+    let target_headers = target_response.headers().clone();
+    let bytes = target_response
+        .bytes()
+        .await
+        .context("failed to read target file response")?;
+
+    let mut response = Response::builder().status(status);
+
+    if let Some(content_type) = target_headers.get(CONTENT_TYPE) {
+        response = response.header(CONTENT_TYPE, content_type.clone());
+    } else {
+        response = response.header(CONTENT_TYPE, "application/octet-stream");
+    }
+
+    if let Some(content_disposition) = target_headers.get(CONTENT_DISPOSITION) {
+        response = response.header(CONTENT_DISPOSITION, content_disposition.clone());
+    }
+
+    response
+        .body(Body::from(bytes))
+        .context("failed to build file data response")
+}
+
 fn service_info(host: &str, port: u16) -> ServiceInfo {
     let base_url = format!("http://{host}:{port}");
     ServiceInfo {
         bind_host: host.to_string(),
         port,
         forward_url: format!("{base_url}/forward"),
+        file_data_url: format!("{base_url}/file-data"),
         health_url: format!("{base_url}/health"),
         base_url,
     }
