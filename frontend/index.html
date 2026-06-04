@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>接口请求转发客户端</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel status-panel">
+        <div>
+          <p class="eyebrow">Proxy Forwarder</p>
+          <h1>接口请求转发客户端</h1>
+          <p class="muted">应用启动后会在本机开启 HTTP 服务，外部程序可调用本地地址完成请求转发。</p>
+        </div>
+        <div class="status-pill" id="serverStatus">启动中</div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>服务地址</h2>
+          <div class="field">
+            <label>转发接口</label>
+            <div class="copy-row">
+              <input id="forwardUrl" readonly value="http://127.0.0.1:39291/forward" />
+              <button id="copyForwardUrl" type="button">复制</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>健康检查</label>
+            <div class="copy-row">
+              <input id="healthUrl" readonly value="http://127.0.0.1:39291/health" />
+              <button id="copyHealthUrl" type="button">复制</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>请求参数</h2>
+          <pre>{
+  "method": "POST",
+  "url": "https://example.com/api",
+  "headers": { "Authorization": "Bearer token" },
+  "query": { "page": "1" },
+  "body": { "name": "demo" },
+  "timeoutMs": 30000
+}</pre>
+        </article>
+      </section>
+
+      <section class="panel tester">
+        <div class="tester-head">
+          <h2>本机测试</h2>
+          <button id="sendTest" type="button">发送测试请求</button>
+        </div>
+        <textarea id="requestBody" spellcheck="false">{
+  "method": "GET",
+  "url": "https://httpbin.org/get",
+  "query": {
+    "source": "tauri-client"
+  }
+}</textarea>
+        <pre id="responseBody" class="response">等待发送...</pre>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
