@@ -1,8 +1,8 @@
 [package]
 name = "proxy-forwarder"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Tauri 2 desktop client that exposes a local HTTP forwarding API."
-authors = ["demo1"]
+authors = ["lhy"]
 edition = "2021"
 
 [lib]
